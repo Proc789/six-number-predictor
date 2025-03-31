@@ -4,9 +4,14 @@ import random
 app = Flask(__name__)
 history = []
 predictions = []
+hits = 0
+total = 0
+stage = 1
+training = False
 
 @app.route("/", methods=["GET", "POST"])
 def home():
+    global hits, total, stage, training
     result = None
     last_champion = None
     last_prediction = None
@@ -23,7 +28,18 @@ def home():
             if len(predictions) >= 1:
                 last_prediction = predictions[-1]
                 last_champion = current[0]
-                hit = "命中" if last_champion in last_prediction else "未命中"
+                if last_champion in last_prediction:
+                    hit = "命中"
+                    if training:
+                        hits += 1
+                        stage = 1
+                else:
+                    hit = "未命中"
+                    if training:
+                        stage += 1
+
+                if training:
+                    total += 1
 
             if len(history) >= 3:
                 prediction = generate_prediction()
@@ -35,8 +51,22 @@ def home():
         except:
             result = "格式錯誤，請輸入 1~10 的整數"
 
+    toggle_text = "關閉訓練模式" if training else "啟動訓練模式"
     return render_template_string(TEMPLATE, result=result, history=history[-5:],
-                                  last_champion=last_champion, last_prediction=last_prediction, hit=hit)
+                                  last_champion=last_champion, last_prediction=last_prediction,
+                                  hit=hit, training=training, toggle_text=toggle_text,
+                                  stats=f"{hits} / {total}" if training else None,
+                                  stage=stage if training else None)
+
+@app.route("/toggle")
+def toggle():
+    global training, hits, total, stage
+    training = not training
+    if training:
+        hits = 0
+        total = 0
+        stage = 1
+    return "<script>window.location.href='/'</script>"
 
 def generate_prediction():
     recent = history[-3:]
@@ -88,8 +118,14 @@ TEMPLATE = """
       </div>
     </form>
     <br>
+    <a href="/toggle"><button>{{ toggle_text }}</button></a>
+    {% if training %}
+      <div><strong>訓練中...</strong></div>
+      <div>命中率：{{ stats }}</div>
+      <div>目前階段：第 {{ stage }} 關</div>
+    {% endif %}
     {% if last_champion %}
-      <div><strong>上期冠軍號碼：</strong>{{ last_champion }}</div>
+      <br><div><strong>上期冠軍號碼：</strong>{{ last_champion }}</div>
       <div><strong>是否命中：</strong>{{ hit }}</div>
       <div><strong>上期預測號碼：</strong>{{ last_prediction }}</div>
     {% endif %}
