@@ -1,6 +1,5 @@
-from flask import Flask, render_template_string, request, redirect
+from flask import Flask, render_template_string, request
 import random
-import requests
 
 app = Flask(__name__)
 history = []
@@ -13,50 +12,48 @@ training = False
 TEMPLATE = """
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>6 號碼預測器</title>
-    <meta name='viewport' content='width=device-width, initial-scale=1'>
-  </head>
-  <body style="max-width: 400px; margin: auto; padding-top: 50px; text-align: center; font-family: sans-serif;">
-    <h2>6 號碼預測器</h2>
-    <form method="POST">
-      <div>
-        <input type="number" name="first" placeholder="冠軍號碼" required style="width: 80%; padding: 8px;"><br><br>
-        <input type="number" name="second" placeholder="亞軍號碼" required style="width: 80%; padding: 8px;"><br><br>
-        <input type="number" name="third" placeholder="季軍號碼" required style="width: 80%; padding: 8px;"><br><br>
-        <button type="submit" style="padding: 10px 20px;">提交</button>
-      </div>
-    </form>
-    <br>
-    <a href="/toggle"><button>{{ toggle_text }}</button></a>
-    {% if training %}
-      <div><strong>訓練中...</strong></div>
-      <div>命中率：{{ stats }}</div>
-      <div>目前階段：第 {{ stage }} 關</div>
-    {% endif %}
-    {% if last_champion %}
-      <br><div><strong>上期冠軍號碼：</strong>{{ last_champion }}</div>
-      <div><strong>是否命中：</strong>{{ hit }}</div>
-      <div><strong>上期預測號碼：</strong>{{ last_prediction }}</div>
-    {% endif %}
-    {% if result %}
-      <br><div><strong>下期預測號碼：</strong> {{ result }}</div>
-    {% endif %}
-    <br>
-    <div style="text-align: left;">
-      <strong>最近輸入紀錄：</strong>
-      <ul>
-        {% for row in history %}
-          <li>{{ row }}</li>
-        {% endfor %}
-      </ul>
-    </div>
-  </body>
+<head>
+  <title>6碼預測器</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="max-width: 400px; margin: auto; padding-top: 50px; text-align: center; font-family: sans-serif;">
+  <h2>6碼預測器</h2>
+  <form method="POST">
+    <input type="number" name="first" placeholder="冠軍號碼" required style="width: 80%; padding: 8px;"><br><br>
+    <input type="number" name="second" placeholder="亞軍號碼" required style="width: 80%; padding: 8px;"><br><br>
+    <input type="number" name="third" placeholder="季軍號碼" required style="width: 80%; padding: 8px;"><br><br>
+    <button type="submit" style="padding: 10px 20px;">提交</button>
+  </form>
+  <br>
+  <a href="/toggle"><button>{{ toggle_text }}</button></a>
+  {% if training %}
+    <div><strong>訓練中...</strong></div>
+    <div>命中率：{{ stats }}</div>
+    <div>目前階段：第 {{ stage }} 關</div>
+  {% endif %}
+  {% if last_champion %}
+    <br><div><strong>上期冠軍號碼：</strong>{{ last_champion }}</div>
+    <div><strong>是否命中：</strong>{{ hit }}</div>
+    <div><strong>上期預測號碼：</strong>{{ last_prediction }}</div>
+  {% endif %}
+  {% if result %}
+    <br><div><strong>下期預測號碼：</strong>{{ result }}</div>
+  {% endif %}
+  <br>
+  <div style="text-align: left;">
+    <strong>最近輸入紀錄：</strong>
+    <ul>
+      {% for row in history %}
+        <li>{{ row }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</body>
 </html>
 """
 
 @app.route("/", methods=["GET", "POST"])
-def home():
+def index():
     global hits, total, stage, training
     result = None
     last_champion = None
@@ -112,7 +109,7 @@ def toggle():
         hits = 0
         total = 0
         stage = 1
-    return redirect("/")
+    return "<script>window.location.href='/'</script>"
 
 def generate_prediction():
     recent = history[-3:]
@@ -129,16 +126,19 @@ def generate_prediction():
             continue
         break
 
-    # 兩個動態熱號（最近兩期冠軍）
-    dynamic_hot_list = list({g[0] for g in history[-2:] if g[0] != hot})
-    while len(dynamic_hot_list) < 2:
-        dynamic_hot_list.append(random.choice([n for n in range(1, 11) if n not in dynamic_hot_list and n != hot]))
+    last_champion = history[-1][0]
+    dynamic_hot = last_champion if last_champion != hot else next((n for n in hot_candidates if n != hot), random.choice([n for n in range(1, 11) if n != hot]))
 
-    avoid = {hot} | set(dynamic_hot_list)
-    pool = list(set(range(1, 11)) - avoid)
+    freq_all = {i: sum(1 for h in history[-6:] if i in h) for i in range(1, 11)}
+    min_count = min(freq_all.values())
+    cold_candidates = [n for n in freq_all if freq_all[n] == min_count and n not in (hot, dynamic_hot)]
+    cold = random.choice(cold_candidates) if cold_candidates else random.choice([n for n in range(1, 11) if n not in (hot, dynamic_hot)])
 
-    rands = random.sample(pool, 3)
-    return sorted([hot] + dynamic_hot_list + rands)
+    avoid = {hot, dynamic_hot, cold}
+    remaining = [n for n in range(1, 11) if n not in avoid]
+    rands = random.sample(remaining, 3)
+
+    return sorted([hot, dynamic_hot, cold] + rands)
 
 if __name__ == "__main__":
     app.run(debug=True)
