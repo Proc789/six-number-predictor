@@ -1,8 +1,8 @@
 from flask import Flask, render_template_string, request, redirect
 import random
-import requests
 
 app = Flask(__name__)
+
 history = []
 predictions = []
 hits = 0
@@ -20,12 +20,10 @@ TEMPLATE = """
   <body style="max-width: 400px; margin: auto; padding-top: 50px; text-align: center; font-family: sans-serif;">
     <h2>6 號碼預測器</h2>
     <form method="POST">
-      <div>
-        <input type="number" name="first" placeholder="冠軍號碼" required style="width: 80%; padding: 8px;"><br><br>
-        <input type="number" name="second" placeholder="亞軍號碼" required style="width: 80%; padding: 8px;"><br><br>
-        <input type="number" name="third" placeholder="季軍號碼" required style="width: 80%; padding: 8px;"><br><br>
-        <button type="submit" style="padding: 10px 20px;">提交</button>
-      </div>
+      <input type="number" name="first" placeholder="冠軍號碼" required><br><br>
+      <input type="number" name="second" placeholder="亞軍號碼" required><br><br>
+      <input type="number" name="third" placeholder="季軍號碼" required><br><br>
+      <button type="submit">提交</button>
     </form>
     <br>
     <a href="/toggle"><button>{{ toggle_text }}</button></a>
@@ -42,15 +40,6 @@ TEMPLATE = """
     {% if result %}
       <br><div><strong>下期預測號碼：</strong> {{ result }}</div>
     {% endif %}
-    <br>
-    <div style="text-align: left;">
-      <strong>最近輸入紀錄：</strong>
-      <ul>
-        {% for row in history %}
-          <li>{{ row }}</li>
-        {% endfor %}
-      </ul>
-    </div>
   </body>
 </html>
 """
@@ -93,9 +82,8 @@ def home():
                 result = prediction
             else:
                 result = "請至少輸入三期資料後才可預測"
-
         except:
-            result = "格式錯誤，請輸入 1~10 的整數"
+            result = "格式錯誤，請輸入正確數字"
 
     toggle_text = "關閉訓練模式" if training else "啟動訓練模式"
     return render_template_string(TEMPLATE, result=result, history=history[-5:],
@@ -120,6 +108,7 @@ def generate_prediction():
     freq = {n: flat.count(n) for n in set(flat)}
     max_freq = max(freq.values())
     hot_candidates = [n for n in freq if freq[n] == max_freq]
+
     for group in reversed(recent):
         for n in group:
             if n in hot_candidates:
@@ -130,17 +119,14 @@ def generate_prediction():
         break
 
     last_champion = history[-1][0]
-    dynamic_hot = last_champion if last_champion != hot else next((n for n in hot_candidates if n != hot), random.choice([n for n in range(1, 11) if n != hot]))
+    dynamic_hot = last_champion if last_champion != hot else random.choice([n for n in range(1, 11) if n != hot])
 
-    all_numbers = set(range(1, 11))
-    cold_freq = {n: flat.count(n) for n in range(1, 11)}
-    min_count = min(cold_freq.values())
-    cold_candidates = [n for n in range(1, 6) if cold_freq.get(n, 0) == min_count and n not in (hot, dynamic_hot)]
-    cold = random.choice(cold_candidates) if cold_candidates else random.choice([n for n in range(1, 6) if n not in (hot, dynamic_hot)])
+    cold_candidates = [n for n in range(1, 11) if n not in flat]
+    cold = random.choice(cold_candidates) if cold_candidates else random.choice([n for n in range(1, 11) if n not in (hot, dynamic_hot)])
 
     avoid = {hot, dynamic_hot, cold}
-    pool = list(all_numbers - avoid)
-    random_part = random.sample(pool, 2)
+    pool = [n for n in range(1, 11) if n not in avoid]
+    random_part = random.sample(pool, 3)
 
     return sorted([hot, dynamic_hot, cold] + random_part)
 
