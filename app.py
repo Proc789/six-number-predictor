@@ -13,11 +13,11 @@ TEMPLATE = """
 <!DOCTYPE html>
 <html>
   <head>
-    <title>6 號碼預測器</title>
+    <title>6 號碼預測器 v3 強化版</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
   </head>
   <body style="max-width: 400px; margin: auto; padding-top: 50px; text-align: center; font-family: sans-serif;">
-    <h2>6 號碼預測器</h2>
+    <h2>6 號碼預測器 v3 強化版</h2>
     <form method="POST">
       <div>
         <input type="number" name="first" placeholder="冠軍號碼" required style="width: 80%; padding: 8px;"><br><br>
@@ -82,7 +82,6 @@ def home():
                     hit = "未命中"
                     if training:
                         stage += 1
-
                 if training:
                     total += 1
 
@@ -114,34 +113,38 @@ def toggle():
     return redirect("/")
 
 def generate_prediction():
-    recent = history[-3:]
+    recent = history[-5:]
     flat = [n for group in recent for n in group]
     freq = {n: flat.count(n) for n in set(flat)}
-    max_freq = max(freq.values())
-    hot_candidates = [n for n in freq if freq[n] == max_freq]
-    for group in reversed(recent):
-        for n in group:
-            if n in hot_candidates:
-                hot = n
-                break
-        else:
-            continue
-        break
+
+    hot_candidates = sorted(freq.items(), key=lambda x: (-x[1], -last_index(x[0])))
+    hot = hot_candidates[0][0]
 
     last_champion = history[-1][0]
-    dynamic_hot = last_champion if last_champion != hot else next((n for n in hot_candidates if n != hot), random.choice([n for n in range(1, 11) if n != hot]))
+    dynamic_hot = last_champion if last_champion != hot else next((n for n, _ in hot_candidates if n != hot), random.choice([n for n in range(1, 11) if n != hot]))
 
-    all_numbers = set(range(1, 11))
-    cold_freq = {n: flat.count(n) for n in range(1, 11)}
-    min_count = min(cold_freq.values())
-    cold_candidates = [n for n in all_numbers if cold_freq[n] == min_count and n not in (hot, dynamic_hot)]
-    cold = random.choice(cold_candidates) if cold_candidates else random.choice(list(all_numbers - {hot, dynamic_hot}))
+    cold_pool = [n for n in range(1, 6) if n not in (hot, dynamic_hot)]
+    cold_freq = {n: flat.count(n) for n in cold_pool}
+    min_freq = min(cold_freq.values()) if cold_freq else 0
+    cold_candidates = [n for n in cold_pool if cold_freq[n] == min_freq]
+    cold = random.choice(cold_candidates) if cold_candidates else random.choice(cold_pool)
 
     avoid = {hot, dynamic_hot, cold}
+    all_numbers = set(range(1, 11))
     pool = list(all_numbers - avoid)
-    random_part = random.sample(pool, 3)
 
-    return sorted([hot, dynamic_hot, cold] + random_part)
+    prev_random = [n for n in predictions[-1] if n not in (hot, dynamic_hot, cold)] if predictions else []
+    for _ in range(10):
+        rands = random.sample(pool, 3)
+        if len(set(rands) & set(prev_random)) <= 2:
+            return sorted([hot, dynamic_hot, cold] + rands)
+    return sorted([hot, dynamic_hot, cold] + random.sample(pool, 3))
+
+def last_index(num):
+    for i in range(len(history)-1, -1, -1):
+        if num in history[i]:
+            return i
+    return -1
 
 if __name__ == "__main__":
     app.run(debug=True)
