@@ -105,11 +105,11 @@ TEMPLATE = """
 <!DOCTYPE html>
 <html>
   <head>
-    <title>5 號碼預測器</title>
+    <title>6 號碼預測器</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
   </head>
   <body style="max-width: 400px; margin: auto; padding-top: 50px; text-align: center; font-family: sans-serif;">
-    <h2>5 號碼預測器</h2>
+    <h2>6 號碼預測器</h2>
     <form method="POST">
       <div>
         <input type="number" name="first" placeholder="冠軍號碼" required style="width: 80%; padding: 8px;"><br><br>
