@@ -1,7 +1,9 @@
-from flask import Flask, render_template_string, request
+from flask import Flask, render_template_string, redirect
 import random
+import requests
 
 app = Flask(__name__)
+
 history = []
 predictions = []
 hits = 0
@@ -13,16 +15,13 @@ TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-  <title>6碼預測器</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>5 號碼預測器</title>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
 </head>
 <body style="max-width: 400px; margin: auto; padding-top: 50px; text-align: center; font-family: sans-serif;">
-  <h2>6碼預測器</h2>
+  <h2>5 號碼預測器</h2>
   <form method="POST">
-    <input type="number" name="first" placeholder="冠軍號碼" required style="width: 80%; padding: 8px;"><br><br>
-    <input type="number" name="second" placeholder="亞軍號碼" required style="width: 80%; padding: 8px;"><br><br>
-    <input type="number" name="third" placeholder="季軍號碼" required style="width: 80%; padding: 8px;"><br><br>
-    <button type="submit" style="padding: 10px 20px;">提交</button>
+    <button type="submit">抓取開獎 + 預測</button>
   </form>
   <br>
   <a href="/toggle"><button>{{ toggle_text }}</button></a>
@@ -37,7 +36,7 @@ TEMPLATE = """
     <div><strong>上期預測號碼：</strong>{{ last_prediction }}</div>
   {% endif %}
   {% if result %}
-    <br><div><strong>下期預測號碼：</strong>{{ result }}</div>
+    <br><div><strong>下期預測號碼：</strong> {{ result }}</div>
   {% endif %}
   <br>
   <div style="text-align: left;">
@@ -52,64 +51,20 @@ TEMPLATE = """
 </html>
 """
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    global hits, total, stage, training
-    result = None
-    last_champion = None
-    last_prediction = None
-    hit = None
-
-    if request.method == "POST":
-        try:
-            first = int(request.form.get("first"))
-            second = int(request.form.get("second"))
-            third = int(request.form.get("third"))
-            current = [first, second, third]
-            history.append(current)
-
-            if len(predictions) >= 1:
-                last_prediction = predictions[-1]
-                last_champion = current[0]
-                if last_champion in last_prediction:
-                    hit = "命中"
-                    if training:
-                        hits += 1
-                        stage = 1
-                else:
-                    hit = "未命中"
-                    if training:
-                        stage += 1
-
-                if training:
-                    total += 1
-
-            if len(history) >= 3:
-                prediction = generate_prediction()
-                predictions.append(prediction)
-                result = prediction
-            else:
-                result = "請至少輸入三期資料後才可預測"
-
-        except:
-            result = "格式錯誤，請輸入 1~10 的整數"
-
-    toggle_text = "關閉訓練模式" if training else "啟動訓練模式"
-    return render_template_string(TEMPLATE, result=result, history=history[-5:],
-                                  last_champion=last_champion, last_prediction=last_prediction,
-                                  hit=hit, training=training, toggle_text=toggle_text,
-                                  stats=f"{hits} / {total}" if training else None,
-                                  stage=stage if training else None)
-
-@app.route("/toggle")
-def toggle():
-    global training, hits, total, stage
-    training = not training
-    if training:
-        hits = 0
-        total = 0
-        stage = 1
-    return "<script>window.location.href='/'</script>"
+def get_latest_top3():
+    try:
+        url = "https://ar1.ar198.com/api_r/get/result"
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Referer": "https://ar1.ar198.com/",
+        }
+        res = requests.post(url, headers=headers)
+        data = res.json()
+        return data["data"]["list"][0]["last"]["n"][:3]
+    except Exception as e:
+        print("❌ 無法取得開獎號碼：", e)
+        return []
 
 def generate_prediction():
     recent = history[-3:]
@@ -129,16 +84,63 @@ def generate_prediction():
     last_champion = history[-1][0]
     dynamic_hot = last_champion if last_champion != hot else next((n for n in hot_candidates if n != hot), random.choice([n for n in range(1, 11) if n != hot]))
 
-    freq_all = {i: sum(1 for h in history[-6:] if i in h) for i in range(1, 11)}
-    min_count = min(freq_all.values())
-    cold_candidates = [n for n in freq_all if freq_all[n] == min_count and n not in (hot, dynamic_hot)]
-    cold = random.choice(cold_candidates) if cold_candidates else random.choice([n for n in range(1, 11) if n not in (hot, dynamic_hot)])
+    # 找冷號（出現最少次）
+    cold_freq = {n: flat.count(n) for n in range(1, 11)}
+    min_count = min(cold_freq.values())
+    cold_candidates = [n for n in range(1, 6) if cold_freq.get(n, 0) == min_count and n not in (hot, dynamic_hot)]
+    cold = random.choice(cold_candidates) if cold_candidates else random.choice([n for n in range(1, 6) if n not in (hot, dynamic_hot)])
 
     avoid = {hot, dynamic_hot, cold}
-    remaining = [n for n in range(1, 11) if n not in avoid]
-    rands = random.sample(remaining, 3)
+    pool = [n for n in range(1, 11) if n not in avoid]
+    random.shuffle(pool)
+    rands = random.sample(pool, 2)
 
     return sorted([hot, dynamic_hot, cold] + rands)
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    global hits, total, stage, training
+    result = None
+    last_champion = None
+    last_prediction = None
+    hit = None
+
+    if len(history) >= 3:
+        prediction = generate_prediction()
+        predictions.append(prediction)
+        result = prediction
+
+    if len(predictions) >= 1:
+        current = get_latest_top3()
+        if current:
+            history.append(current)
+            last_prediction = predictions[-1]
+            last_champion = current[0]
+            hit = "命中" if last_champion in last_prediction else "未命中"
+            if training:
+                total += 1
+                if hit == "命中":
+                    hits += 1
+                    stage = 1
+                else:
+                    stage += 1
+
+    toggle_text = "關閉訓練模式" if training else "啟動訓練模式"
+    return render_template_string(TEMPLATE, result=result, history=history[-10:],
+                                  last_champion=last_champion, last_prediction=last_prediction,
+                                  hit=hit, training=training, toggle_text=toggle_text,
+                                  stats=f"{hits} / {total}" if training else None,
+                                  stage=stage if training else None)
+
+@app.route("/toggle")
+def toggle():
+    global training, hits, total, stage
+    training = not training
+    if training:
+        hits = 0
+        total = 0
+        stage = 1
+    return redirect("/")
 
 if __name__ == "__main__":
     app.run(debug=True)
