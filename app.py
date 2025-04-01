@@ -15,13 +15,13 @@ TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-  <title>5 號碼預測器</title>
+  <title>6 號碼預測器</title>
   <meta name='viewport' content='width=device-width, initial-scale=1'>
 </head>
 <body style="max-width: 400px; margin: auto; padding-top: 50px; text-align: center; font-family: sans-serif;">
-  <h2>5 號碼預測器</h2>
+  <h2>6 號碼預測器</h2>
   <form method="POST">
-    <button type="submit">抓取開獎 + 預測</button>
+    <button type="submit">自動擷取開獎 + 預測</button>
   </form>
   <br>
   <a href="/toggle"><button>{{ toggle_text }}</button></a>
@@ -53,17 +53,11 @@ TEMPLATE = """
 
 def get_latest_top3():
     try:
-        url = "https://ar1.ar198.com/api_r/get/result"
-        headers = {
-            "User-Agent": "Mozilla/5.0",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Referer": "https://ar1.ar198.com/",
-        }
-        res = requests.post(url, headers=headers)
+        res = requests.post("https://ar1.ar198.com/api/r/get/result")
         data = res.json()
-        return data["data"]["list"][0]["last"]["n"][:3]
-    except Exception as e:
-        print("❌ 無法取得開獎號碼：", e)
+        top3 = data["data"]["list"][0]["last"]["n"][:3]
+        return top3
+    except:
         return []
 
 def generate_prediction():
@@ -84,7 +78,6 @@ def generate_prediction():
     last_champion = history[-1][0]
     dynamic_hot = last_champion if last_champion != hot else next((n for n in hot_candidates if n != hot), random.choice([n for n in range(1, 11) if n != hot]))
 
-    # 找冷號（出現最少次）
     cold_freq = {n: flat.count(n) for n in range(1, 11)}
     min_count = min(cold_freq.values())
     cold_candidates = [n for n in range(1, 6) if cold_freq.get(n, 0) == min_count and n not in (hot, dynamic_hot)]
@@ -92,7 +85,6 @@ def generate_prediction():
 
     avoid = {hot, dynamic_hot, cold}
     pool = [n for n in range(1, 11) if n not in avoid]
-    random.shuffle(pool)
     rands = random.sample(pool, 2)
 
     return sorted([hot, dynamic_hot, cold] + rands)
