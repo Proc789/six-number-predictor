@@ -86,29 +86,30 @@ def generate_prediction():
     last_champion = history[-1][0]
     dynamic_hot = last_champion if last_champion != hot else next((n for n in hot_candidates if n != hot), random.choice([n for n in range(1, 11) if n != hot]))
 
-    pool = [n for n in range(1, 11) if n not in (hot, dynamic_hot)]
-    random.shuffle(pool)
+    # 冷號邏輯：統計最近 6 期最少出現號碼
+    last_6 = history[-6:] if len(history) >= 6 else history
+    all_nums = [n for group in last_6 for n in group]
+    count_map = {i: all_nums.count(i) for i in range(1, 11)}
+    min_count = min(count_map.values())
+    cold_pool = [k for k, v in count_map.items() if v == min_count and k not in (hot, dynamic_hot)]
+    cold = random.choice(cold_pool) if cold_pool else random.choice([n for n in range(1, 11) if n not in (hot, dynamic_hot)])
 
-    prev_random = []
-    if len(predictions) > 0:
-        prev_random = [n for n in predictions[-1] if n not in (hot, dynamic_hot)]
+    # 從剩下的號碼池中完全隨機選出 3 碼
+    excluded = {hot, dynamic_hot, cold}
+    pool = [n for n in range(1, 11) if n not in excluded]
+    rands = random.sample(pool, 3)
 
-    for _ in range(10):
-        rands = random.sample(pool, 4)
-        if len(set(rands) & set(prev_random)) <= 2:
-            return sorted([hot, dynamic_hot] + rands)
-
-    return sorted([hot, dynamic_hot] + random.sample(pool, 4))
+    return sorted([hot, dynamic_hot, cold] + rands)
 
 TEMPLATE = """
 <!DOCTYPE html>
 <html>
   <head>
-    <title>6 號碼預測器</title>
+    <title>5 號碼預測器</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
   </head>
   <body style="max-width: 400px; margin: auto; padding-top: 50px; text-align: center; font-family: sans-serif;">
-    <h2>6 號碼預測器</h2>
+    <h2>5 號碼預測器</h2>
     <form method="POST">
       <div>
         <input type="number" name="first" placeholder="冠軍號碼" required style="width: 80%; padding: 8px;"><br><br>
