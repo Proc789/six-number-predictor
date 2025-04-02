@@ -13,15 +13,18 @@ TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-  <title>6碼預測器</title>
+  <title>6碼預測器（優化版）</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body style="max-width: 400px; margin: auto; padding-top: 50px; text-align: center; font-family: sans-serif;">
-  <h2>6碼預測器</h2>
+  <h2>6碼預測器（優化版）</h2>
   <form method="POST">
-    <input type="number" name="first" placeholder="冠軍號碼" required style="width: 80%; padding: 8px;"><br><br>
-    <input type="number" name="second" placeholder="亞軍號碼" required style="width: 80%; padding: 8px;"><br><br>
-    <input type="number" name="third" placeholder="季軍號碼" required style="width: 80%; padding: 8px;"><br><br>
+    <input type="number" name="first" id="first" placeholder="冠軍號碼" required min="0" max="10"
+           style="width: 80%; padding: 8px;" oninput="handleInput(this, 'second')"><br><br>
+    <input type="number" name="second" id="second" placeholder="亞軍號碼" required min="0" max="10"
+           style="width: 80%; padding: 8px;" oninput="handleInput(this, 'third')"><br><br>
+    <input type="number" name="third" id="third" placeholder="季軍號碼" required min="0" max="10"
+           style="width: 80%; padding: 8px;"><br><br>
     <button type="submit" style="padding: 10px 20px;">提交</button>
   </form>
   <br>
@@ -48,6 +51,19 @@ TEMPLATE = """
       {% endfor %}
     </ul>
   </div>
+
+  <script>
+    function handleInput(current, nextId) {
+      let val = parseInt(current.value);
+      if (val === 0) current.value = 10;
+      if (current.value.length >= 1 && val >= 1 && val <= 10) {
+        document.getElementById(nextId).focus();
+      } else if (val > 10 || val < 0 || isNaN(val)) {
+        if (navigator.vibrate) navigator.vibrate(200);
+        current.value = '';
+      }
+    }
+  </script>
 </body>
 </html>
 """
@@ -65,6 +81,12 @@ def index():
             first = int(request.form.get("first"))
             second = int(request.form.get("second"))
             third = int(request.form.get("third"))
+
+            # 將 0 自動轉換為 10
+            first = 10 if first == 0 else first
+            second = 10 if second == 0 else second
+            third = 10 if third == 0 else third
+
             current = [first, second, third]
             history.append(current)
 
