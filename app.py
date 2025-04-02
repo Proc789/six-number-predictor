@@ -55,7 +55,14 @@ TEMPLATE = """
   <script>
     function handleInput(current, nextId) {
       let val = parseInt(current.value);
-      if (val === 0) current.value = 10;
+      if (val === 0) {
+        current.value = 10;
+        setTimeout(() => {
+          document.getElementById(nextId).focus();
+        }, 50);
+        return;
+      }
+
       if (current.value.length >= 1 && val >= 1 && val <= 10) {
         document.getElementById(nextId).focus();
       } else if (val > 10 || val < 0 || isNaN(val)) {
