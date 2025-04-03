@@ -22,6 +22,10 @@ def home():
             first = int(request.form.get("first"))
             second = int(request.form.get("second"))
             third = int(request.form.get("third"))
+            first = 10 if first == 0 else first
+            second = 10 if second == 0 else second
+            third = 10 if third == 0 else third
+
             current = [first, second, third]
             history.append(current)
 
@@ -106,9 +110,9 @@ TEMPLATE = """
     <h2>6 號碼預測器（hotplus-v2）</h2>
     <form method="POST">
       <div>
-        <input type="number" name="first" placeholder="冠軍號碼" required style="width: 80%; padding: 8px;"><br><br>
-        <input type="number" name="second" placeholder="亞軍號碼" required style="width: 80%; padding: 8px;"><br><br>
-        <input type="number" name="third" placeholder="季軍號碼" required style="width: 80%; padding: 8px;"><br><br>
+        <input type="number" name="first" id="first" placeholder="冠軍號碼" required style="width: 80%; padding: 8px;" oninput="handleInput(this, 'second')"><br><br>
+        <input type="number" name="second" id="second" placeholder="亞軍號碼" required style="width: 80%; padding: 8px;" oninput="handleInput(this, 'third')"><br><br>
+        <input type="number" name="third" id="third" placeholder="季軍號碼" required style="width: 80%; padding: 8px;"><br><br>
         <button type="submit" style="padding: 10px 20px;">提交</button>
       </div>
     </form>
@@ -136,6 +140,20 @@ TEMPLATE = """
         {% endfor %}
       </ul>
     </div>
+
+    <script>
+      function handleInput(current, nextId) {
+        let val = parseInt(current.value);
+        if (val === 0) {
+          current.value = 10;
+        }
+        if (current.value.length >= 1 && val >= 1 && val <= 10) {
+          setTimeout(() => {
+            document.getElementById(nextId).focus();
+          }, 50);
+        }
+      }
+    </script>
   </body>
 </html>
 """
