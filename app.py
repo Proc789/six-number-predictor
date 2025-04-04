@@ -103,16 +103,16 @@ TEMPLATE = """
 <!DOCTYPE html>
 <html>
   <head>
-    <title>6 號碼預測器（hotplus-v2）</title>
+    <title>6 號碼預測器（hotplus-v2 改善輸入）</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
   </head>
   <body style="max-width: 400px; margin: auto; padding-top: 50px; text-align: center; font-family: sans-serif;">
-    <h2>6 號碼預測器（hotplus-v2）</h2>
+    <h2>6 號碼預測器（hotplus-v2 改善輸入）</h2>
     <form method="POST">
       <div>
-        <input type="number" name="first" id="first" placeholder="冠軍號碼" required style="width: 80%; padding: 8px;" oninput="handleInput(this, 'second')"><br><br>
-        <input type="number" name="second" id="second" placeholder="亞軍號碼" required style="width: 80%; padding: 8px;" oninput="handleInput(this, 'third')"><br><br>
-        <input type="number" name="third" id="third" placeholder="季軍號碼" required style="width: 80%; padding: 8px;"><br><br>
+        <input type="tel" name="first" id="first" placeholder="冠軍號碼" required style="width: 80%; padding: 8px;" oninput="handleInput(this, 'second')"><br><br>
+        <input type="tel" name="second" id="second" placeholder="亞軍號碼" required style="width: 80%; padding: 8px;" oninput="handleInput(this, 'third')"><br><br>
+        <input type="tel" name="third" id="third" placeholder="季軍號碼" required style="width: 80%; padding: 8px;"><br><br>
         <button type="submit" style="padding: 10px 20px;">提交</button>
       </div>
     </form>
@@ -150,7 +150,7 @@ TEMPLATE = """
         if (current.value.length >= 1 && val >= 1 && val <= 10) {
           setTimeout(() => {
             document.getElementById(nextId).focus();
-          }, 50);
+          }, 100);
         }
       }
     </script>
