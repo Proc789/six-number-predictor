@@ -1,6 +1,5 @@
-from flask import Flask, render_template_string, request
+from flask import Flask, render_template_string, request, redirect
 import random
-from collections import Counter
 
 app = Flask(__name__)
 history = []
@@ -70,7 +69,17 @@ def toggle():
         hits = 0
         total = 0
         stage = 1
-    return "<script>window.location.href='/'</script>"
+    return redirect("/")
+
+@app.route("/reset")
+def reset():
+    global history, predictions, hits, total, stage
+    history.clear()
+    predictions.clear()
+    hits = 0
+    total = 0
+    stage = 1
+    return redirect("/")
 
 def generate_prediction():
     recent = history[-3:]
@@ -89,9 +98,13 @@ def generate_prediction():
     pool = [n for n in range(1, 11) if n not in used]
     random.shuffle(pool)
 
+    prev_random = []
+    if len(predictions) > 0:
+        prev_random = [n for n in predictions[-1] if n not in hot and n not in dynamic_hot]
+
     for _ in range(10):
         extra = random.sample(pool, 2)
-        if len(set(extra) & set(predictions[-1] if predictions else [])) <= 3:
+        if len(set(extra) & set(prev_random)) <= 3:
             return sorted(hot + dynamic_hot + extra)
 
     return sorted(hot + dynamic_hot + random.sample(pool, 2))
@@ -100,12 +113,12 @@ TEMPLATE = """
 <!DOCTYPE html>
 <html>
   <head>
-    <title>6 號碼預測器（hotplus-v2）</title>
+    <title>6 號碼預測器</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
   </head>
   <body style="max-width: 400px; margin: auto; padding-top: 50px; text-align: center; font-family: sans-serif;">
     <h2>6 號碼預測器</h2>
-    <div>版本：hotplus-v2（公版UI）</div>
+    <div style='font-weight: bold;'>版本：hotplus-v2（公版UI）</div>
     <form method="POST">
       <div>
         <input type="number" name="first" id="first" placeholder="冠軍號碼" required style="width: 80%; padding: 8px;" oninput="handleInput(this, 'second')"><br><br>
@@ -116,6 +129,7 @@ TEMPLATE = """
     </form>
     <br>
     <a href="/toggle"><button>{{ toggle_text }}</button></a>
+    <a href="/reset"><button style="margin-top: 5px; background-color: #f88;">清除資料</button></a>
     {% if training %}
       <div><strong>訓練中...</strong></div>
       <div>命中率：{{ stats }}</div>
