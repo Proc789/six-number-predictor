@@ -1,5 +1,6 @@
 from flask import Flask, render_template_string, request
 import random
+from collections import Counter
 
 app = Flask(__name__)
 history = []
@@ -88,13 +89,9 @@ def generate_prediction():
     pool = [n for n in range(1, 11) if n not in used]
     random.shuffle(pool)
 
-    prev_random = []
-    if len(predictions) > 0:
-        prev_random = [n for n in predictions[-1] if n not in hot and n not in dynamic_hot]
-
     for _ in range(10):
         extra = random.sample(pool, 2)
-        if len(set(extra) & set(prev_random)) <= 3:
+        if len(set(extra) & set(predictions[-1] if predictions else [])) <= 3:
             return sorted(hot + dynamic_hot + extra)
 
     return sorted(hot + dynamic_hot + random.sample(pool, 2))
@@ -103,16 +100,17 @@ TEMPLATE = """
 <!DOCTYPE html>
 <html>
   <head>
-    <title>6 號碼預測器（hotplus-v2 改善輸入）</title>
+    <title>6 號碼預測器（hotplus-v2）</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
   </head>
   <body style="max-width: 400px; margin: auto; padding-top: 50px; text-align: center; font-family: sans-serif;">
-    <h2>6 號碼預測器（hotplus-v2 改善輸入）</h2>
+    <h2>6 號碼預測器</h2>
+    <div>版本：hotplus-v2（公版UI）</div>
     <form method="POST">
       <div>
-        <input type="tel" name="first" id="first" placeholder="冠軍號碼" required style="width: 80%; padding: 8px;" oninput="handleInput(this, 'second')"><br><br>
-        <input type="tel" name="second" id="second" placeholder="亞軍號碼" required style="width: 80%; padding: 8px;" oninput="handleInput(this, 'third')"><br><br>
-        <input type="tel" name="third" id="third" placeholder="季軍號碼" required style="width: 80%; padding: 8px;"><br><br>
+        <input type="number" name="first" id="first" placeholder="冠軍號碼" required style="width: 80%; padding: 8px;" oninput="handleInput(this, 'second')"><br><br>
+        <input type="number" name="second" id="second" placeholder="亞軍號碼" required style="width: 80%; padding: 8px;" oninput="handleInput(this, 'third')"><br><br>
+        <input type="number" name="third" id="third" placeholder="季軍號碼" required style="width: 80%; padding: 8px;"><br><br>
         <button type="submit" style="padding: 10px 20px;">提交</button>
       </div>
     </form>
@@ -150,7 +148,7 @@ TEMPLATE = """
         if (current.value.length >= 1 && val >= 1 && val <= 10) {
           setTimeout(() => {
             document.getElementById(nextId).focus();
-          }, 100);
+          }, 50);
         }
       }
     </script>
