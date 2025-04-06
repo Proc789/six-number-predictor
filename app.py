@@ -24,7 +24,7 @@ TEMPLATE = """
 </head>
 <body style='max-width: 400px; margin: auto; padding-top: 40px; font-family: sans-serif; text-align: center;'>
   <h2>6碼預測器</h2>
-  <div>版本：熱2 + 動2 + 補2</div>
+  <div>版本：熱2 + 動2 + 補2（公版UI）</div>
   <form method='POST'>
     <input name='first' id='first' placeholder='冠軍' required style='width: 80%; padding: 8px;' oninput="moveToNext(this, 'second')" inputmode="numeric"><br><br>
     <input name='second' id='second' placeholder='亞軍' required style='width: 80%; padding: 8px;' oninput="moveToNext(this, 'third')" inputmode="numeric"><br><br>
@@ -39,7 +39,10 @@ TEMPLATE = """
     <div style='margin-top: 20px;'>
       <strong>本期預測號碼：</strong> {{ prediction }}（目前第 {{ stage }} 關）
     </div>
+  {% elif stage and history|length >= 5 and predictions %}
+    <div style='margin-top: 20px;'>目前第 {{ stage }} 關</div>
   {% endif %}
+
   {% if last_prediction %}
     <div style='margin-top: 10px;'>
       <strong>上期預測號碼：</strong> {{ last_prediction }}
@@ -56,11 +59,11 @@ TEMPLATE = """
     </div>
   {% endif %}
 
-  {% if history_data %}
+  {% if history %}
     <div style='margin-top: 20px; text-align: left;'>
       <strong>最近輸入紀錄：</strong>
       <ul>
-        {% for row in history_data %}
+        {% for row in history[-10:] %}
           <li>第 {{ loop.index }} 期：{{ row }}</li>
         {% endfor %}
       </ul>
@@ -122,7 +125,7 @@ def index():
         prediction=prediction,
         last_prediction=last_prediction,
         stage=stage,
-        history_data=history[-10:],
+        history=history[-10:],
         training=training,
         hits=hits,
         total=total,
@@ -147,7 +150,8 @@ def reset():
     predictions.clear()
     sources.clear()
     debug_logs.clear()
-    hits = total = stage = 1
+    hits = total = 0
+    stage = 1
     hot_hits = dynamic_hits = extra_hits = 0
     training = False
     return redirect('/')
