@@ -6,6 +6,9 @@ from collections import Counter
 app = Flask(__name__)
 app.secret_key = 'any-secret-key'
 
+# ============================
+# 資料與狀態
+# ============================
 history = []
 predictions = []
 sources = []
@@ -22,6 +25,9 @@ last_champion_zone = ""
 was_observed = False
 observation_message = ""
 
+# ============================
+# UI 模板
+# ============================
 TEMPLATE = """
 <!DOCTYPE html>
 <html>
@@ -102,6 +108,33 @@ TEMPLATE = """
 </html>
 """
 
+# ============================
+# 預測邏輯（補碼補足）
+# ============================
+def make_prediction(stage):
+    recent = history[-3:]
+    flat = [n for g in recent for n in g]
+    freq = Counter(flat)
+    hot = [n for n, _ in freq.most_common(3)][:2]
+    dynamic_pool = [n for n in freq if n not in hot]
+    dynamic_sorted = sorted(dynamic_pool, key=lambda x: (-freq[x], -flat[::-1].index(x)))
+    dynamic = dynamic_sorted[:2]
+    used = set(hot + dynamic)
+    pool = [n for n in range(1, 11) if n not in used]
+    random.shuffle(pool)
+    extra = pool[:2]
+    result = sorted(hot + dynamic + extra)
+    if len(result) < 6:
+        remaining = [n for n in range(1, 11) if n not in result]
+        random.shuffle(remaining)
+        result += remaining[:6 - len(result)]
+        result = sorted(result)
+    sources.append({'hot': hot, 'dynamic': dynamic, 'extra': extra})
+    return result
+
+# ============================
+# 觀察期
+# ============================
 @app.route('/observe')
 def observe():
     global was_observed, observation_message, last_champion_zone
@@ -115,120 +148,103 @@ def observe():
         history.append(current)
 
         if len(history) >= 3:
-            flat = [n for g in history[-3:] for n in g]
-            freq = Counter(flat)
-            hot = [n for n, _ in freq.most_common(3)][:2]
-            dynamic_pool = [n for n in freq if n not in hot]
-            dynamic_sorted = sorted(dynamic_pool, key=lambda x: (-freq[x], -flat[::-1].index(x)))
-            dynamic = dynamic_sorted[:2]
-            extra_pool = [n for n in range(1, 11) if n not in hot + dynamic]
-            random.shuffle(extra_pool)
-            extra = extra_pool[:2]
+            prediction = make_prediction(min(current_stage, 5))
+            predictions.append(prediction)
+            session['next_prediction'] = prediction
 
-            sources.append({'hot': hot, 'dynamic': dynamic, 'extra': extra})
-
+            src = sources[-1]
             if training_enabled:
-                if first in hot:
+                if first in src['hot']:
                     last_champion_zone = "熱號區"
-                    hot_hits += 1
-                elif first in dynamic:
+                    globals()['hot_hits'] += 1
+                elif first in src['dynamic']:
                     last_champion_zone = "動熱區"
-                    dynamic_hits += 1
-                elif first in extra:
+                    globals()['dynamic_hits'] += 1
+                elif first in src['extra']:
                     last_champion_zone = "補碼區"
-                    extra_hits += 1
+                    globals()['extra_hits'] += 1
                 else:
                     last_champion_zone = "未命中"
-                all_hits += 1
-                total_tests += 1
+                globals()['all_hits'] += 1
+                globals()['total_tests'] += 1
 
-            hot_pool = hot + dynamic
+            hot_pool = src['hot'] + src['dynamic']
             rhythm_history.append(1 if first in hot_pool else 0)
             if len(rhythm_history) > 5:
                 rhythm_history.pop(0)
             recent = rhythm_history[-3:]
             total = sum(recent)
-            global rhythm_state
             if recent == [0, 0, 1]:
-                rhythm_state = "預熱期"
+                globals()['rhythm_state'] = "預熱期"
             elif total >= 2:
-                rhythm_state = "穩定期"
+                globals()['rhythm_state'] = "穩定期"
             elif total == 0:
-                rhythm_state = "失準期"
+                globals()['rhythm_state'] = "失準期"
             else:
-                rhythm_state = "搖擺期"
-
-            prediction = make_prediction(min(current_stage, 5))
-            predictions.append(prediction)
-            session['next_prediction'] = prediction
-
+                globals()['rhythm_state'] = "搖擺期"
     except:
-        observation_message = "觀察期資料格式錯誤"
+        observation_message = "觀察期格式錯誤"
     return redirect('/')
 
+# ============================
+# 主畫面輸入
+# ============================
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    global hot_hits, dynamic_hits, extra_hits, all_hits, total_tests
-    global current_stage, training_enabled, was_observed, observation_message
-    global rhythm_history, rhythm_state, last_champion_zone
-
+    global current_stage, was_observed, observation_message
     prediction = session.pop('next_prediction', None)
     last_prediction = predictions[-1] if predictions else None
-    observation_message = ""
-
     if request.method == 'POST':
         try:
-            first = int(request.form['first']) or 10
-            second = int(request.form['second']) or 10
-            third = int(request.form['third']) or 10
+            first = int(request.form['first'])
+            second = int(request.form['second'])
+            third = int(request.form['third'])
             current = [first, second, third]
             history.append(current)
 
             if len(predictions) >= 1:
                 champion = current[0]
                 if champion in predictions[-1]:
-                    all_hits += 1
+                    globals()['all_hits'] += 1
                     current_stage = 1
-                else:
-                    if not was_observed:
-                        current_stage = 1 if current_stage == 5 else current_stage + 1
+                elif not was_observed:
+                    current_stage = 1 if current_stage == 5 else current_stage + 1
 
                 if training_enabled:
-                    total_tests += 1
-                    if champion in sources[-1]['hot']:
-                        hot_hits += 1
-                        last_champion_zone = "熱號區"
-                    elif champion in sources[-1]['dynamic']:
-                        dynamic_hits += 1
-                        last_champion_zone = "動熱區"
-                    elif champion in sources[-1]['extra']:
-                        extra_hits += 1
-                        last_champion_zone = "補碼區"
+                    globals()['total_tests'] += 1
+                    src = sources[-1]
+                    if champion in src['hot']:
+                        globals()['hot_hits'] += 1
+                        globals()['last_champion_zone'] = "熱號區"
+                    elif champion in src['dynamic']:
+                        globals()['dynamic_hits'] += 1
+                        globals()['last_champion_zone'] = "動熱區"
+                    elif champion in src['extra']:
+                        globals()['extra_hits'] += 1
+                        globals()['last_champion_zone'] = "補碼區"
                     else:
-                        last_champion_zone = "未命中"
+                        globals()['last_champion_zone'] = "未命中"
 
-                hot_pool = sources[-1]['hot'] + sources[-1]['dynamic']
-                rhythm_history.append(1 if champion in hot_pool else 0)
-                if len(rhythm_history) > 5:
-                    rhythm_history.pop(0)
-                recent = rhythm_history[-3:]
-                total = sum(recent)
-                if recent == [0, 0, 1]:
-                    rhythm_state = "預熱期"
-                elif total >= 2:
-                    rhythm_state = "穩定期"
-                elif total == 0:
-                    rhythm_state = "失準期"
-                else:
-                    rhythm_state = "搖擺期"
+                    hot_pool = src['hot'] + src['dynamic']
+                    rhythm_history.append(1 if champion in hot_pool else 0)
+                    if len(rhythm_history) > 5:
+                        rhythm_history.pop(0)
+                    recent = rhythm_history[-3:]
+                    total = sum(recent)
+                    if recent == [0, 0, 1]:
+                        globals()['rhythm_state'] = "預熱期"
+                    elif total >= 2:
+                        globals()['rhythm_state'] = "穩定期"
+                    elif total == 0:
+                        globals()['rhythm_state'] = "失準期"
+                    else:
+                        globals()['rhythm_state'] = "搖擺期"
 
             prediction = make_prediction(min(current_stage, 5))
             predictions.append(prediction)
             was_observed = False
-
         except:
             prediction = ['格式錯誤']
-
     return render_template_string(TEMPLATE,
         prediction=prediction,
         last_prediction=last_prediction,
@@ -244,6 +260,9 @@ def index():
         last_champion_zone=last_champion_zone,
         observation_message=observation_message)
 
+# ============================
+# 切換與重置
+# ============================
 @app.route('/toggle')
 def toggle():
     global training_enabled, hot_hits, dynamic_hits, extra_hits, all_hits, total_tests, current_stage, predictions
@@ -263,34 +282,4 @@ def reset():
     hot_hits = dynamic_hits = extra_hits = all_hits = total_tests = 0
     current_stage = 1
     return redirect('/')
-
-# ✅ 修正後的 make_prediction，保證產出 6 碼（補足）
-def make_prediction(stage):
-    recent = history[-3:]
-    flat = [n for g in recent for n in g]
-    freq = Counter(flat)
-
-    hot = [n for n, _ in freq.most_common(3)][:2]
-    dynamic_pool = [n for n in freq if n not in hot]
-    dynamic_sorted = sorted(dynamic_pool, key=lambda x: (-freq[x], -flat[::-1].index(x)))
-    dynamic = dynamic_sorted[:2]
-
-    used = set(hot + dynamic)
-    pool = [n for n in range(1, 11) if n not in used]
-    random.shuffle(pool)
-    extra = pool[:2]
-
-    result = sorted(hot + dynamic + extra)
-
-    if len(result) < 6:
-        all_numbers = set(range(1, 11))
-        remaining = list(all_numbers - set(result))
-        random.shuffle(remaining)
-        result += remaining[:6 - len(result)]
-        result = sorted(result)
-
-    sources.append({'hot': hot, 'dynamic': dynamic, 'extra': extra})
-    return result
-
-if __name__ == '__main__':
     app.run(debug=True)
