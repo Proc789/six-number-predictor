@@ -100,26 +100,46 @@ TEMPLATE = """
 </html>
 """
 
-# 預測邏輯更新為：熱號2 + 動熱2 + 補碼2（共6碼）
-def make_prediction(stage):
-    recent = history[-3:]
-    flat = [n for g in recent for n in g]
-    freq = Counter(flat)
+@app.route('/observe')
+def observe():
+    global was_observed, observation_message
+    was_observed = True
+    observation_message = "上期為觀察期"
+    try:
+        first = int(request.args.get('first', '10'))
+        second = int(request.args.get('second', '10'))
+        third = int(request.args.get('third', '10'))
+        current = [first, second, third]
+        history.append(current)
 
-    hot = [n for n, _ in freq.most_common(3)][:2]
-    dynamic_pool = [n for n in freq if n not in hot]
-    dynamic_sorted = sorted(dynamic_pool, key=lambda x: (-freq[x], -flat[::-1].index(x)))
-    dynamic = dynamic_sorted[:2]
+        if len(history) >= 3:
+            flat = [n for g in history[-3:] for n in g]
+            freq = Counter(flat)
 
-    h = hot[:2]
-    d = dynamic[:2]
-    used = set(h + d)
-    pool = [n for n in range(1, 11) if n not in used]
-    random.shuffle(pool)
-    extra = pool[:2]  # 改為補2碼
+            hot = [n for n, _ in freq.most_common(3)][:2]
+            dynamic_pool = [n for n in freq if n not in hot]
+            dynamic_sorted = sorted(dynamic_pool, key=lambda x: (-freq[x], -flat[::-1].index(x)))
+            dynamic = dynamic_sorted[:2]
+            hot_pool = hot + dynamic
 
-    sources.append({'hot': h, 'dynamic': d, 'extra': extra})
-    return sorted(h + d + extra)
+            rhythm_history.append(1 if first in hot_pool else 0)
+            if len(rhythm_history) > 5:
+                rhythm_history.pop(0)
+            recent = rhythm_history[-3:]
+            total = sum(recent)
+            global rhythm_state
+            if recent == [0, 0, 1]:
+                rhythm_state = "預熱期"
+            elif total >= 2:
+                rhythm_state = "穩定期"
+            elif total == 0:
+                rhythm_state = "失準期"
+            else:
+                rhythm_state = "搖擺期"
+    except:
+        observation_message = "觀察期資料格式錯誤"
+    return redirect('/')
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     global hot_hits, dynamic_hits, extra_hits, all_hits, total_tests
@@ -222,6 +242,26 @@ def reset():
     hot_hits = dynamic_hits = extra_hits = all_hits = total_tests = 0
     current_stage = 1
     return redirect('/')
+
+def make_prediction(stage):
+    recent = history[-3:]
+    flat = [n for g in recent for n in g]
+    freq = Counter(flat)
+
+    hot = [n for n, _ in freq.most_common(3)][:2]
+    dynamic_pool = [n for n in freq if n not in hot]
+    dynamic_sorted = sorted(dynamic_pool, key=lambda x: (-freq[x], -flat[::-1].index(x)))
+    dynamic = dynamic_sorted[:2]
+
+    h = hot[:2]
+    d = dynamic[:2]
+    used = set(h + d)
+    pool = [n for n in range(1, 11) if n not in used]
+    random.shuffle(pool)
+    extra = pool[:2]
+
+    sources.append({'hot': h, 'dynamic': d, 'extra': extra})
+    return sorted(h + d + extra)
 
 if __name__ == '__main__':
     app.run(debug=True)
