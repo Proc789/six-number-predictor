@@ -23,7 +23,6 @@ rhythm_history = []
 rhythm_state = "未知"
 last_champion_zone = ""
 was_observed = False
-observation_message = ""
 
 # ============================
 # UI 模板
@@ -109,7 +108,7 @@ TEMPLATE = """
 """
 
 # ============================
-# 預測邏輯（補碼補足）
+# make_prediction（保證6碼）
 # ============================
 def make_prediction(stage):
     recent = history[-3:]
@@ -137,9 +136,9 @@ def make_prediction(stage):
 # ============================
 @app.route('/observe')
 def observe():
-    global was_observed, observation_message, last_champion_zone
+    global was_observed, last_champion_zone
     was_observed = True
-    observation_message = "上期為觀察期，已產出下一期預測碼（不影響關卡）"
+    session['observation_message'] = "上期為觀察期，已產出下一期預測碼（不影響關卡）"
     try:
         first = int(request.args.get('first', '10'))
         second = int(request.args.get('second', '10'))
@@ -183,17 +182,18 @@ def observe():
             else:
                 globals()['rhythm_state'] = "搖擺期"
     except:
-        observation_message = "觀察期格式錯誤"
+        session['observation_message'] = "觀察期資料格式錯誤"
     return redirect('/')
 
 # ============================
-# 主畫面輸入
+# 主頁面邏輯
 # ============================
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    global current_stage, was_observed, observation_message
+    global current_stage, was_observed, last_champion_zone
     prediction = session.pop('next_prediction', None)
     last_prediction = predictions[-1] if predictions else None
+    observation_message = session.pop('observation_message', '')
     if request.method == 'POST':
         try:
             first = int(request.form['first'])
@@ -215,15 +215,15 @@ def index():
                     src = sources[-1]
                     if champion in src['hot']:
                         globals()['hot_hits'] += 1
-                        globals()['last_champion_zone'] = "熱號區"
+                        last_champion_zone = "熱號區"
                     elif champion in src['dynamic']:
                         globals()['dynamic_hits'] += 1
-                        globals()['last_champion_zone'] = "動熱區"
+                        last_champion_zone = "動熱區"
                     elif champion in src['extra']:
                         globals()['extra_hits'] += 1
-                        globals()['last_champion_zone'] = "補碼區"
+                        last_champion_zone = "補碼區"
                     else:
-                        globals()['last_champion_zone'] = "未命中"
+                        last_champion_zone = "未命中"
 
                     hot_pool = src['hot'] + src['dynamic']
                     rhythm_history.append(1 if champion in hot_pool else 0)
@@ -261,7 +261,7 @@ def index():
         observation_message=observation_message)
 
 # ============================
-# 切換與重置
+# 控制功能
 # ============================
 @app.route('/toggle')
 def toggle():
@@ -282,4 +282,9 @@ def reset():
     hot_hits = dynamic_hits = extra_hits = all_hits = total_tests = 0
     current_stage = 1
     return redirect('/')
+
+# ============================
+# 啟動應用
+# ============================
+if __name__ == '__main__':
     app.run(debug=True)
