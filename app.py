@@ -120,3 +120,108 @@ def make_prediction(stage):
 
     sources.append({'hot': h, 'dynamic': d, 'extra': extra})
     return sorted(h + d + extra)
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    global hot_hits, dynamic_hits, extra_hits, all_hits, total_tests
+    global current_stage, training_enabled, was_observed, observation_message
+    global rhythm_history, rhythm_state, last_champion_zone
+
+    prediction = None
+    last_prediction = predictions[-1] if predictions else None
+    observation_message = ""
+
+    if request.method == 'POST':
+        try:
+            first = int(request.form['first']) or 10
+            second = int(request.form['second']) or 10
+            third = int(request.form['third']) or 10
+            current = [first, second, third]
+            history.append(current)
+
+            if len(predictions) >= 1:
+                champion = current[0]
+                if champion in predictions[-1]:
+                    all_hits += 1
+                    current_stage = 1
+                else:
+                    if not was_observed:
+                        if current_stage == 5:
+                            observation_message = "第5關失敗，預測重置"
+                            current_stage = 1
+                        else:
+                            current_stage += 1
+
+                if training_enabled:
+                    total_tests += 1
+                    if champion in sources[-1]['hot']:
+                        hot_hits += 1
+                        last_champion_zone = "熱號區"
+                    elif champion in sources[-1]['dynamic']:
+                        dynamic_hits += 1
+                        last_champion_zone = "動熱區"
+                    elif champion in sources[-1]['extra']:
+                        extra_hits += 1
+                        last_champion_zone = "補碼區"
+                    else:
+                        last_champion_zone = "未命中"
+
+                hot_pool = sources[-1]['hot'] + sources[-1]['dynamic']
+                rhythm_history.append(1 if champion in hot_pool else 0)
+                if len(rhythm_history) > 5:
+                    rhythm_history.pop(0)
+                recent = rhythm_history[-3:]
+                total = sum(recent)
+                if recent == [0, 0, 1]:
+                    rhythm_state = "預熱期"
+                elif total >= 2:
+                    rhythm_state = "穩定期"
+                elif total == 0:
+                    rhythm_state = "失準期"
+                else:
+                    rhythm_state = "搖擺期"
+
+            stage_to_use = min(current_stage, 5)
+            prediction = make_prediction(stage_to_use)
+            predictions.append(prediction)
+            was_observed = False
+
+        except:
+            prediction = ['格式錯誤']
+
+    return render_template_string(TEMPLATE,
+        prediction=prediction,
+        last_prediction=last_prediction,
+        stage=current_stage,
+        history=history,
+        training=training_enabled,
+        hot_hits=hot_hits,
+        dynamic_hits=dynamic_hits,
+        extra_hits=extra_hits,
+        all_hits=all_hits,
+        total_tests=total_tests,
+        rhythm_state=rhythm_state,
+        last_champion_zone=last_champion_zone,
+        observation_message=observation_message)
+
+@app.route('/toggle')
+def toggle():
+    global training_enabled, hot_hits, dynamic_hits, extra_hits, all_hits, total_tests, current_stage, predictions
+    training_enabled = not training_enabled
+    hot_hits = dynamic_hits = extra_hits = all_hits = total_tests = 0
+    current_stage = 1
+    predictions = []
+    return redirect('/')
+
+@app.route('/reset')
+def reset():
+    global history, predictions, sources, hot_hits, dynamic_hits, extra_hits, all_hits, total_tests, current_stage, rhythm_history
+    history.clear()
+    predictions.clear()
+    sources.clear()
+    rhythm_history.clear()
+    hot_hits = dynamic_hits = extra_hits = all_hits = total_tests = 0
+    current_stage = 1
+    return redirect('/')
+
+if __name__ == '__main__':
+    app.run(debug=True)
