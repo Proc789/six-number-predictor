@@ -102,7 +102,7 @@ TEMPLATE = """
 
 @app.route('/observe')
 def observe():
-    global was_observed, observation_message
+    global was_observed, observation_message, last_champion_zone
     was_observed = True
     observation_message = "上期為觀察期"
     try:
@@ -120,8 +120,23 @@ def observe():
             dynamic_pool = [n for n in freq if n not in hot]
             dynamic_sorted = sorted(dynamic_pool, key=lambda x: (-freq[x], -flat[::-1].index(x)))
             dynamic = dynamic_sorted[:2]
-            hot_pool = hot + dynamic
+            extra_pool = [n for n in range(1, 11) if n not in hot + dynamic]
+            random.shuffle(extra_pool)
+            extra = extra_pool[:2]
 
+            sources.append({'hot': hot, 'dynamic': dynamic, 'extra': extra})
+
+            if training_enabled:
+                if first in hot:
+                    last_champion_zone = "熱號區"
+                elif first in dynamic:
+                    last_champion_zone = "動熱區"
+                elif first in extra:
+                    last_champion_zone = "補碼區"
+                else:
+                    last_champion_zone = "未命中"
+
+            hot_pool = hot + dynamic
             rhythm_history.append(1 if first in hot_pool else 0)
             if len(rhythm_history) > 5:
                 rhythm_history.pop(0)
@@ -139,6 +154,7 @@ def observe():
     except:
         observation_message = "觀察期資料格式錯誤"
     return redirect('/')
+
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
