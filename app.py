@@ -1,8 +1,11 @@
-from flask import Flask, render_template_string, request, redirect
+# 6碼分析器 - 追關版（觀察期修正 + 預測顯示）
+from flask import Flask, render_template_string, request, redirect, session
 import random
 from collections import Counter
 
 app = Flask(__name__)
+app.secret_key = 'any-secret-key'  # 用於觀察期預測碼儲存
+
 history = []
 predictions = []
 sources = []
@@ -45,6 +48,11 @@ TEMPLATE = """
   </form>
   <a href='/toggle'><button>{{ '關閉統計模式' if training else '啟動統計模式' }}</button></a>
   <a href='/reset'><button style='margin-left: 10px;'>清除所有資料</button></a>
+  {% if obs_prediction %}
+    <div style='margin-top: 20px; color: gray;'>
+      <strong>觀察期預測號碼：</strong> {{ obs_prediction }}
+    </div>
+  {% endif %}
   {% if prediction %}
     <div style='margin-top: 20px;'>
       <strong>本期預測號碼：</strong> {{ prediction }}（目前第 {{ stage }} 關）<br>
@@ -154,6 +162,7 @@ def observe():
             stage_to_use = min(current_stage, 5)
             prediction = make_prediction(stage_to_use)
             predictions.append(prediction)
+            session['obs_prediction'] = prediction
 
     except:
         observation_message = "觀察期資料格式錯誤"
@@ -168,6 +177,7 @@ def index():
     prediction = None
     last_prediction = predictions[-1] if predictions else None
     observation_message = ""
+    obs_prediction = session.pop('obs_prediction', None)
 
     if request.method == 'POST':
         try:
@@ -240,7 +250,8 @@ def index():
         total_tests=total_tests,
         rhythm_state=rhythm_state,
         last_champion_zone=last_champion_zone,
-        observation_message=observation_message)
+        observation_message=observation_message,
+        obs_prediction=obs_prediction)
 
 @app.route('/toggle')
 def toggle():
