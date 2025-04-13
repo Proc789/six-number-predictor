@@ -264,6 +264,7 @@ def reset():
     current_stage = 1
     return redirect('/')
 
+# ✅ 修正後的 make_prediction，保證產出 6 碼（補足）
 def make_prediction(stage):
     recent = history[-3:]
     flat = [n for g in recent for n in g]
@@ -273,12 +274,23 @@ def make_prediction(stage):
     dynamic_pool = [n for n in freq if n not in hot]
     dynamic_sorted = sorted(dynamic_pool, key=lambda x: (-freq[x], -flat[::-1].index(x)))
     dynamic = dynamic_sorted[:2]
+
     used = set(hot + dynamic)
     pool = [n for n in range(1, 11) if n not in used]
     random.shuffle(pool)
     extra = pool[:2]
+
+    result = sorted(hot + dynamic + extra)
+
+    if len(result) < 6:
+        all_numbers = set(range(1, 11))
+        remaining = list(all_numbers - set(result))
+        random.shuffle(remaining)
+        result += remaining[:6 - len(result)]
+        result = sorted(result)
+
     sources.append({'hot': hot, 'dynamic': dynamic, 'extra': extra})
-    return sorted(hot + dynamic + extra)
+    return result
 
 if __name__ == '__main__':
     app.run(debug=True)
