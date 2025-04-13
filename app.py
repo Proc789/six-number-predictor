@@ -1,4 +1,3 @@
-# 6碼分析器 - 追關版（5關邏輯，固定熱2+動2+補2）
 from flask import Flask, render_template_string, request, redirect
 import random
 from collections import Counter
@@ -104,7 +103,7 @@ TEMPLATE = """
 def observe():
     global was_observed, observation_message, last_champion_zone
     was_observed = True
-    observation_message = "上期為觀察期"
+    observation_message = "上期為觀察期，已產出下期預測碼（不影響關卡）"
     try:
         first = int(request.args.get('first', '10'))
         second = int(request.args.get('second', '10'))
@@ -151,10 +150,14 @@ def observe():
                 rhythm_state = "失準期"
             else:
                 rhythm_state = "搖擺期"
+
+            stage_to_use = min(current_stage, 5)
+            prediction = make_prediction(stage_to_use)
+            predictions.append(prediction)
+
     except:
         observation_message = "觀察期資料格式錯誤"
     return redirect('/')
-
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
