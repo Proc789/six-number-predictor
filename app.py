@@ -1,8 +1,11 @@
-from flask import Flask, render_template_string, request, redirect
+# 6碼分析器 - 追關版（觀察期產出預測碼並顯示於下一局畫面）
+from flask import Flask, render_template_string, request, redirect, session
 import random
 from collections import Counter
 
 app = Flask(__name__)
+app.secret_key = 'any-secret-key'
+
 history = []
 predictions = []
 sources = []
@@ -29,7 +32,7 @@ TEMPLATE = """
 </head>
 <body style='max-width: 400px; margin: auto; padding-top: 40px; font-family: sans-serif; text-align: center;'>
   <h2>預測器</h2>
-  <div>版本：6碼分析器・追關版（觀察期會預測，關卡不變）</div>
+  <div>版本：6碼分析器・追關版</div>
   <form method='POST'>
     <input name='first' id='first' placeholder='冠軍' required style='width: 80%; padding: 8px;' oninput="moveToNext(this, 'second')" inputmode="numeric"><br><br>
     <input name='second' id='second' placeholder='亞軍' required style='width: 80%; padding: 8px;' oninput="moveToNext(this, 'third')" inputmode="numeric"><br><br>
@@ -114,7 +117,6 @@ def observe():
         if len(history) >= 3:
             flat = [n for g in history[-3:] for n in g]
             freq = Counter(flat)
-
             hot = [n for n, _ in freq.most_common(3)][:2]
             dynamic_pool = [n for n in freq if n not in hot]
             dynamic_sorted = sorted(dynamic_pool, key=lambda x: (-freq[x], -flat[::-1].index(x)))
@@ -156,9 +158,9 @@ def observe():
             else:
                 rhythm_state = "搖擺期"
 
-            stage_to_use = min(current_stage, 5)
-            prediction = make_prediction(stage_to_use)
+            prediction = make_prediction(min(current_stage, 5))
             predictions.append(prediction)
+            session['next_prediction'] = prediction
 
     except:
         observation_message = "觀察期資料格式錯誤"
@@ -170,7 +172,7 @@ def index():
     global current_stage, training_enabled, was_observed, observation_message
     global rhythm_history, rhythm_state, last_champion_zone
 
-    prediction = None
+    prediction = session.pop('next_prediction', None)
     last_prediction = predictions[-1] if predictions else None
     observation_message = ""
 
@@ -189,11 +191,7 @@ def index():
                     current_stage = 1
                 else:
                     if not was_observed:
-                        if current_stage == 5:
-                            observation_message = "第5關失敗，預測重置"
-                            current_stage = 1
-                        else:
-                            current_stage += 1
+                        current_stage = 1 if current_stage == 5 else current_stage + 1
 
                 if training_enabled:
                     total_tests += 1
@@ -224,8 +222,7 @@ def index():
                 else:
                     rhythm_state = "搖擺期"
 
-            stage_to_use = min(current_stage, 5)
-            prediction = make_prediction(stage_to_use)
+            prediction = make_prediction(min(current_stage, 5))
             predictions.append(prediction)
             was_observed = False
 
@@ -276,16 +273,12 @@ def make_prediction(stage):
     dynamic_pool = [n for n in freq if n not in hot]
     dynamic_sorted = sorted(dynamic_pool, key=lambda x: (-freq[x], -flat[::-1].index(x)))
     dynamic = dynamic_sorted[:2]
-
-    h = hot[:2]
-    d = dynamic[:2]
-    used = set(h + d)
+    used = set(hot + dynamic)
     pool = [n for n in range(1, 11) if n not in used]
     random.shuffle(pool)
     extra = pool[:2]
-
-    sources.append({'hot': h, 'dynamic': d, 'extra': extra})
-    return sorted(h + d + extra)
+    sources.append({'hot': hot, 'dynamic': dynamic, 'extra': extra})
+    return sorted(hot + dynamic + extra)
 
 if __name__ == '__main__':
     app.run(debug=True)
